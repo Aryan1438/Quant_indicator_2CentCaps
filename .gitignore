@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
+*.log
+reports/*.csv
+reports/*.html
+!reports/performance_metrics.csv
+!reports/backtest_report.html
+dashboard/.streamlit/
+streamlit_app.log

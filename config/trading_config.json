@@ -1,0 +1,21 @@
+{
+  "symbol": "BTCUSDT",
+  "timeframe": "1H",
+  "higher_timeframes": ["4H", "1D"],
+  "capital": 100000,
+  "risk_per_trade": 0.01,
+  "reward_risk": 2.5,
+  "atr_period": 14,
+  "swing_window": 3,
+  "structure_window": 5,
+  "ob_lookback": 12,
+  "require_fvg_confirmation": true,
+  "use_dynamic_rr": true,
+  "allow_long": true,
+  "allow_short": true,
+  "max_open_trades": 1,
+  "trailing_stop_atr": 1.5,
+  "liquidity_sweep_buffer_atr": 0.15,
+  "mtf_alignment_required": true,
+  "log_level": "INFO"
+}
