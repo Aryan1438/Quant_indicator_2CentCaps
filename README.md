@@ -1,6 +1,21 @@
 # Aryan Price Action Framework
 
-Institutional-style Smart Money Concepts research workspace for quant internship presentation. This project is structured like a real quant research deliverable: a Pine Script strategy, a Python backtesting engine, a Streamlit dashboard, and research documentation packaged for a GitHub portfolio.
+[![Pine Script](https://img.shields.io/badge/Pine%20Script-v5-blue)](https://www.tradingview.com/pine-script-docs/en/v5/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)](https://www.python.org/)
+[![Backtesting.py](https://img.shields.io/badge/Backtesting.py-quant%20research-111827)](https://kernc.github.io/backtesting.py/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-dashboard-FF4B4B)](https://streamlit.io/)
+[![GitHub repo](https://img.shields.io/badge/GitHub-portfolio%20ready-24292F)](https://github.com/Aryan1438/Quant_indicator_2CentCaps)
+
+Institutional-style Smart Money Concepts research workspace for quant internship presentation. The project is structured like a real quant research deliverable: a Pine Script strategy, a Python backtesting engine, a Streamlit dashboard, and research documentation packaged for a GitHub portfolio.
+
+## Overview
+
+This repository is designed to demonstrate a complete research workflow:
+
+- chart-side signal generation in TradingView
+- feature engineering and backtesting in Python
+- performance analysis and monthly reporting
+- portfolio-ready documentation and dashboard presentation
 
 ## Architecture
 

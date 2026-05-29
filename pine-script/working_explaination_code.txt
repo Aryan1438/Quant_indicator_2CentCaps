@@ -1,0 +1,773 @@
+=========================================================
+ARYAN PRICE ACTION INDICATOR
+WORKING DOCUMENTATION
+=========================================================
+
+PROJECT OVERVIEW
+---------------------------------------------------------
+
+Aryan Price Action Indicator is a Smart Money Concepts (SMC)
+based TradingView indicator developed in Pine Script v5.
+
+The indicator automatically detects:
+
+• Market Structure
+• BOS (Break Of Structure)
+• CHoCH (Change Of Character)
+• CHoCH+
+• Internal Structure
+• Swing Structure
+• Volumetric Order Blocks
+• Multi-Timeframe Trend
+• Liquidity Levels
+• Strong High / Weak High
+• Strong Low / Weak Low
+• Fair Value Gaps (FVG)
+• Premium / Discount Zones
+
+The purpose of this indicator is to identify trend,
+market structure shifts, order blocks, and important
+institutional price levels automatically.
+
+=========================================================
+1. BOS (BREAK OF STRUCTURE)
+=========================================================
+
+WHAT IS BOS?
+
+BOS means price continues the current trend by breaking
+an important structure level.
+
+Bullish Example:
+
+HH → HL → HH → HL → HH (Break)
+
+Trend continues upward.
+
+Bearish Example:
+
+LL → LH → LL → LH → LL (Break)
+
+Trend continues downward.
+
+---------------------------------------------------------
+
+CODE USED
+
+Bullish BOS:
+
+ta.crossover(b.c, up.p.first())
+
+Bearish BOS:
+
+ta.crossunder(b.c, dn.p.first())
+
+---------------------------------------------------------
+
+HOW IT WORKS
+
+Step 1:
+
+Indicator finds a Swing High.
+
+Example:
+
+Swing High = 4500
+
+Stored as:
+
+up.p.first()
+
+---------------------------------------------------------
+
+Step 2:
+
+Current candle closes above that Swing High.
+
+Example:
+
+Previous Swing High = 4500
+
+Current Candle:
+
+High = 4510
+Close = 4505
+
+---------------------------------------------------------
+
+Step 3:
+
+Indicator checks:
+
+4505 > 4500
+
+TRUE
+
+---------------------------------------------------------
+
+RESULT
+
+Bullish BOS is created.
+
+Chart shows:
+
+BOS
+
+---------------------------------------------------------
+
+IMPORTANT
+
+Confirmation used:
+
+✓ Pivot High
+✓ Candle Close
+
+Not used:
+
+✗ Volume
+✗ Delta
+✗ Orderflow
+✗ Liquidity
+✗ Orderbook
+
+Only Price Action is used.
+
+=========================================================
+2. CHoCH (CHANGE OF CHARACTER)
+=========================================================
+
+WHAT IS CHoCH?
+
+CHoCH means trend reversal.
+
+Example:
+
+LL
+LH
+LL
+LH
+
+Price breaks above LH
+
+Result:
+
+Trend changes from Bearish to Bullish.
+
+---------------------------------------------------------
+
+CODE USED
+
+if itrend < 0
+    CHoCH := true
+
+---------------------------------------------------------
+
+HOW IT WORKS
+
+Current Trend:
+
+Bearish
+
+Stored as:
+
+itrend = -1
+
+---------------------------------------------------------
+
+Price closes above previous swing high.
+
+Example:
+
+Previous LH = 4500
+
+Current Close = 4505
+
+---------------------------------------------------------
+
+Indicator checks:
+
+itrend < 0
+
+TRUE
+
+---------------------------------------------------------
+
+RESULT
+
+CHoCH is created instead of BOS.
+
+Chart shows:
+
+CHoCH
+
+=========================================================
+3. CHoCH+
+=========================================================
+
+WHAT IS CHoCH+?
+
+CHoCH+ is a stronger version of CHoCH.
+
+It requires additional confirmation.
+
+---------------------------------------------------------
+
+CODE USED
+
+dn.l.first() > dn.l.get(1)
+
+---------------------------------------------------------
+
+HOW IT WORKS
+
+Previous Low = 4480
+
+Current Low = 4490
+
+---------------------------------------------------------
+
+Indicator checks:
+
+4490 > 4480
+
+TRUE
+
+---------------------------------------------------------
+
+A Higher Low is confirmed.
+
+Then structure breaks.
+
+---------------------------------------------------------
+
+RESULT
+
+CHoCH+ is displayed.
+
+Instead of:
+
+CHoCH
+
+Indicator displays:
+
+CHoCH+
+
+---------------------------------------------------------
+
+WHY IS IT STRONGER?
+
+Because:
+
+Higher Low
++
+Structure Break
+
+Both conditions are satisfied.
+
+=========================================================
+4. INTERNAL STRUCTURE
+=========================================================
+
+WHAT IS INTERNAL STRUCTURE?
+
+Small market structure.
+
+Used for:
+
+• Scalping
+• Intraday Trading
+• Short-term Trend Analysis
+
+---------------------------------------------------------
+
+CODE USED
+
+internal_r_lookback = 5
+
+iH = ta.pivothigh(high,iLen,iLen)
+
+iL = ta.pivotlow(low,iLen,iLen)
+
+---------------------------------------------------------
+
+HOW IT WORKS
+
+Default:
+
+iLen = 5
+
+Meaning:
+
+5 candles left
+Current candle
+5 candles right
+
+---------------------------------------------------------
+
+For Pivot High:
+
+Current candle must be highest among all 11 candles.
+
+---------------------------------------------------------
+
+EXAMPLE
+
+20
+22
+25
+30 ← Highest
+27
+26
+24
+
+---------------------------------------------------------
+
+RESULT
+
+Internal Pivot High detected.
+
+=========================================================
+5. SWING STRUCTURE
+=========================================================
+
+WHAT IS SWING STRUCTURE?
+
+Major market structure.
+
+Used for:
+
+• Trend Direction
+• Swing Trading
+• Higher Timeframe Bias
+
+---------------------------------------------------------
+
+CODE USED
+
+swing_r_lookback = 50
+
+sH = ta.pivothigh(high,sLen,sLen)
+
+sL = ta.pivotlow(low,sLen,sLen)
+
+---------------------------------------------------------
+
+HOW IT WORKS
+
+Default:
+
+sLen = 50
+
+Meaning:
+
+50 candles left
+Current candle
+50 candles right
+
+---------------------------------------------------------
+
+For Pivot High:
+
+Current candle must be highest among 101 candles.
+
+---------------------------------------------------------
+
+RESULT
+
+Major Swing High detected.
+
+=========================================================
+6. ORDER BLOCK CREATION
+=========================================================
+
+WHAT IS AN ORDER BLOCK?
+
+Order Block is the price zone from which a strong move
+started after BOS or CHoCH.
+
+---------------------------------------------------------
+
+ORDER BLOCK IS CREATED ONLY AFTER:
+
+✓ BOS
+✓ CHoCH
+✓ CHoCH+
+
+---------------------------------------------------------
+
+CODE USED
+
+bull_ob := true
+
+bear_ob := true
+
+Then:
+
+drawVOB()
+
+runs.
+
+=========================================================
+7. BULLISH ORDER BLOCK DETECTION
+=========================================================
+
+CODE USED
+
+obj.l.min()
+
+---------------------------------------------------------
+
+HOW IT WORKS
+
+After Bullish BOS:
+
+Indicator scans backward.
+
+Finds:
+
+Lowest Low
+
+before the BOS.
+
+---------------------------------------------------------
+
+EXAMPLE
+
+4490
+4485
+4470 ← Lowest Low
+4480
+4490
+
+BOS
+
+---------------------------------------------------------
+
+RESULT
+
+4470 candle becomes Bullish Order Block.
+
+=========================================================
+8. BEARISH ORDER BLOCK DETECTION
+=========================================================
+
+CODE USED
+
+obj.h.max()
+
+---------------------------------------------------------
+
+HOW IT WORKS
+
+After Bearish BOS:
+
+Indicator scans backward.
+
+Finds:
+
+Highest High
+
+before the BOS.
+
+---------------------------------------------------------
+
+EXAMPLE
+
+4510
+4520
+4540 ← Highest High
+4530
+
+Bearish BOS
+
+---------------------------------------------------------
+
+RESULT
+
+4540 candle becomes Bearish Order Block.
+
+=========================================================
+9. VOLUME INSIDE ORDER BLOCK
+=========================================================
+
+IS VOLUME USED FOR BOS?
+
+NO
+
+---------------------------------------------------------
+
+IS VOLUME USED FOR CHoCH?
+
+NO
+
+---------------------------------------------------------
+
+WHERE IS VOLUME USED?
+
+Volume is only used to measure the importance of an
+Order Block.
+
+---------------------------------------------------------
+
+CODE USED
+
+obj.cV.unshift(volume)
+
+---------------------------------------------------------
+
+EXAMPLE
+
+OB Volume = 4600
+
+Other OB Volumes:
+
+2000
+5000
+4000
+
+Total Volume:
+
+15600
+
+---------------------------------------------------------
+
+CALCULATION
+
+4600 ÷ 15600 × 100
+
+= 29%
+
+---------------------------------------------------------
+
+DISPLAYED AS
+
+4.6K (29%)
+
+---------------------------------------------------------
+
+MEANING
+
+This Order Block contains 29% of the total tracked
+Order Block volume.
+
+---------------------------------------------------------
+
+NOT MEANING
+
+✗ Liquidity
+✗ Institutional Orders
+✗ Real Buying Pressure
+✗ Real Selling Pressure
+
+=========================================================
+10. STRONG HIGH / WEAK HIGH
+=========================================================
+
+CODE USED
+
+upphl()
+
+---------------------------------------------------------
+
+STRONG HIGH
+
+Example:
+
+Market Trend = Bearish
+
+Price respects High.
+
+Result:
+
+Strong High
+
+---------------------------------------------------------
+
+MEANING
+
+Market is not breaking that High.
+
+Liquidity remains protected.
+
+---------------------------------------------------------
+
+WEAK HIGH
+
+Example:
+
+Market Trend = Bullish
+
+Price likely to sweep that High.
+
+Result:
+
+Weak High
+
+=========================================================
+11. STRONG LOW / WEAK LOW
+=========================================================
+
+CODE USED
+
+dnphl()
+
+---------------------------------------------------------
+
+STRONG LOW
+
+Market Trend = Bullish
+
+Price respects Low.
+
+Result:
+
+Strong Low
+
+---------------------------------------------------------
+
+WEAK LOW
+
+Market Trend = Bearish
+
+Price likely to sweep Low.
+
+Result:
+
+Weak Low
+
+=========================================================
+12. MULTI-TIMEFRAME TREND SCANNER
+=========================================================
+
+CODE USED
+
+request.security()
+
+---------------------------------------------------------
+
+TIMEFRAMES USED
+
+15 Minute
+
+1 Hour
+
+4 Hour
+
+1 Day
+
+---------------------------------------------------------
+
+HOW IT WORKS
+
+Same BOS / CHoCH engine runs separately on every
+timeframe.
+
+---------------------------------------------------------
+
+EXAMPLE
+
+15m = Bullish
+
+1H = Bullish
+
+4H = Bearish
+
+1D = Bearish
+
+---------------------------------------------------------
+
+RESULT
+
+Displayed in top-right table.
+
+=========================================================
+13. LIQUIDITY DETECTION
+=========================================================
+
+HOW LIQUIDITY IS DETECTED
+
+Indicator uses:
+
+HH
+HL
+LH
+LL
+
+Strong High
+Weak High
+
+Strong Low
+Weak Low
+
+---------------------------------------------------------
+
+IMPORTANT
+
+TradingView does not provide:
+
+✗ Real Liquidity
+✗ Orderbook
+✗ DOM
+✗ Exchange Orders
+
+---------------------------------------------------------
+
+Therefore indicator estimates liquidity using
+Swing Highs and Swing Lows only.
+
+=========================================================
+14. COMPLETE INDICATOR WORKFLOW
+=========================================================
+
+NEW CANDLE ARRIVES
+        ↓
+Find Pivot Highs
+Find Pivot Lows
+        ↓
+Build Internal Structure
+        ↓
+Build Swing Structure
+        ↓
+Detect BOS
+        ↓
+Detect CHoCH
+        ↓
+Detect CHoCH+
+        ↓
+Create Order Block
+        ↓
+Calculate Order Block Volume
+        ↓
+Calculate Strong High / Weak High
+        ↓
+Calculate Strong Low / Weak Low
+        ↓
+Update Multi-Timeframe Trend
+        ↓
+Display Everything On Chart
+
+=========================================================
+FINAL CONCLUSION
+=========================================================
+
+This indicator is primarily a Price Action and Market
+Structure Engine.
+
+BOS and CHoCH are detected using:
+
+• Pivot Highs
+• Pivot Lows
+• Candle Close Confirmation
+
+Order Blocks are created from significant candles
+before a BOS or CHoCH.
+
+Volume is NOT used for BOS confirmation.
+
+Volume is ONLY used to rank Order Blocks and display
+their relative importance.
+
+The indicator combines Market Structure, Order Blocks,
+Liquidity Levels, FVGs and Multi-Timeframe Trend
+Analysis into one complete Smart Money Concepts tool.
+=========================================================
