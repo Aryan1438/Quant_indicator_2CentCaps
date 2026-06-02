@@ -91,14 +91,15 @@ Risk is controlled using fixed fractional sizing, ATR-based stops, reward-to-ris
 
 ## Screenshots
 
-Add finished images in the `screenshots/` folder for a polished portfolio presentation. Recommended files:
+Current GitHub-ready presentation assets in `screenshots/`:
 
-- `screenshots/dashboard-overview.png`
-- `screenshots/equity-curve.png`
-- `screenshots/monthly-performance.png`
-- `screenshots/pine-strategy-overlay.png`
+- `screenshots/Screenshot 2026-05-29 110513.png` - XAUUSD 5m TradingView strategy overlay
+- `screenshots/Screenshot 2026-05-31 143850.png` - backtest equity curve
+- `screenshots/Screenshot 2026-05-31 145120.png` - EURUSD 1h TradingView strategy overlay
+- `screenshots/Screenshot 2026-05-31 145154.png` - USDJPY 1h TradingView strategy overlay
+- `screenshots/Screenshot 2026-05-31 145224.png` - USDJPY 5m TradingView strategy overlay
 
-These screenshots should highlight the dashboard, the equity curve, the monthly performance view, and the TradingView chart overlay.
+The repository can still be expanded later with a Streamlit dashboard capture and a monthly performance view, but these images already cover the core strategy presentation and backtest results.
 
 ## Notes
 
