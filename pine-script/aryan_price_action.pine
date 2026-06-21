@@ -32,7 +32,7 @@ boolean =
  
  
 //-----------------------------------------------------------------------------{
-    // User inputs
+    // User inputs here
 //-----------------------------------------------------------------------------{
  
 show_swing_ms                   = input.string      ("All"                            , "Swing        "               , inline = "1", group = "MARKET STRUCTURE"            , options = ["All", "CHoCH", "CHoCH+", "BOS", "None"])
