@@ -1,0 +1,1517 @@
+=========================================================
+  ARYAN PRICE ACTION INDICATOR
+  COMPLETE WORKING DOCUMENTATION
+  Pine Script v5 | Smart Money Concepts (SMC)
+=========================================================
+=========================================================
+TABLE OF CONTENTS
+=========================================================
+
+  1.  Project Overview
+  2.  Language & Environment
+  3.  Architecture & Data Structures
+  4.  Boolean State Management System
+  5.  BOS – Break Of Structure
+  6.  CHoCH – Change Of Character
+  7.  CHoCH+ – Confirmed Change Of Character
+  8.  Internal Structure
+  9.  Swing Structure
+  10. Dynamic Market Structure Mode
+  11. Order Block Detection
+  12. Bullish Order Block
+  13. Bearish Order Block
+  14. Volumetric Activity Inside Order Blocks
+  15. Order Block Mitigation
+  16. Order Block Overlap Handling
+  17. Strong High / Weak High
+  18. Strong Low / Weak Low
+  19. Equilibrium & Premium / Discount Zones
+  20. Multi-Timeframe Trend Scanner
+  21. MTF Highs & Lows (PDH/PDL/PWH etc.)
+  22. Fair Value Gap (FVG)
+  23. Volume Imbalance (VI)
+  24. Open Gap (OG)
+  25. Accumulation & Distribution Zones
+  26. Equal Highs & Equal Lows (EQH / EQL)
+  27. Alert System
+  28. Plotting & Bar Coloring
+  29. Complete Indicator Workflow
+  30. Final Conclusion
+
+=========================================================
+1. PROJECT OVERVIEW
+=========================================================
+
+Aryan Price Action is a full Smart Money Concepts (SMC)
+indicator built in Pine Script v5 for TradingView.
+
+It is designed to automate institutional price action
+analysis on any market (Stocks, Forex, Crypto, Indices).
+
+WHAT IT DETECTS AUTOMATICALLY:
+
+  • BOS  — Break Of Structure
+  • CHoCH — Change Of Character
+  • CHoCH+ — Confirmed Change Of Character
+  • Internal Market Structure (short-term)
+  • Swing Market Structure  (long-term)
+  • Volumetric Order Blocks
+  • Multi-Timeframe (MTF) Trend Table
+  • Strong High / Weak High
+  • Strong Low  / Weak Low
+  • Equilibrium, Premium & Discount Zones
+  • Fair Value Gaps (FVG)
+  • Volume Imbalance (VI)
+  • Open Gaps (OG)
+  • Accumulation Zones
+  • Distribution Zones
+  • Equal Highs (EQH)
+  • Equal Lows  (EQL)
+  • MTF Previous Day / Week / Month / Year Highs & Lows
+  • Alert conditions for every detected event
+
+PRIMARY PURPOSE:
+
+  Identify trend direction, market structure shifts,
+  institutional order blocks, and key price levels
+  — all automatically on the chart.
+
+=========================================================
+2. LANGUAGE & ENVIRONMENT
+=========================================================
+
+Language:         Pine Script v5
+Platform:         TradingView
+Indicator Type:   Overlay (drawn directly on chart)
+Resource Limits:
+
+  max_lines_count    = 500
+  max_labels_count   = 500
+  max_boxes_count    = 500
+  max_bars_back      = 500
+  max_polylines_count= 100
+
+These limits are set at declaration because Pine Script
+has hard caps on how many graphical objects can exist
+simultaneously on a chart.
+
+=========================================================
+3. ARCHITECTURE & DATA STRUCTURES
+=========================================================
+
+The indicator is built around Pine Script v5 User
+Defined Types (UDTs), which work like lightweight
+classes or structs.
+
+KEY UDTs:
+
+---------------------------------------------------------
+type bar
+---------------------------------------------------------
+  Holds the current bar's OHLCV data plus index and time.
+
+  float  o = open
+  float  c = close
+  float  h = high
+  float  l = low
+  float  v = volume
+  int    n = bar_index
+  int    t = time
+
+  Usage: b.c (close), b.h (high), b.n (bar index)
+  Avoids repetitive use of built-in variables.
+
+---------------------------------------------------------
+type ms (Market Structure)
+---------------------------------------------------------
+  Stores arrays of pivot prices, bar indices, and levels
+  for both internal and swing structure tracking.
+
+  float[]  p   — pivot prices
+  int  []  n   — bar indices of pivots
+  float[]  l   — price levels
+
+  Four instances are used:
+    up  — internal pivot highs
+    dn  — internal pivot lows
+    sup — swing pivot highs
+    sdn — swing pivot lows
+
+---------------------------------------------------------
+type msDraw
+---------------------------------------------------------
+  Data packet for drawing a single BOS/CHoCH line.
+
+  int    n   — bar index where structure broke
+  float  p   — price level of the broken structure
+  color  css — line color
+  string txt — label text ("BOS", "CHoCH", "CHoCH+")
+  bool   bull — true = bullish, false = bearish
+
+---------------------------------------------------------
+type obC (Order Block Coordinates)
+---------------------------------------------------------
+  Stores dynamic arrays of all active order blocks.
+
+  float[]  top   — top price of each OB
+  float[]  btm   — bottom price of each OB
+  int  []  left  — left time of each OB
+  float[]  avg   — midpoint of each OB
+  float[]  dV    — percentage volume share
+  float[]  cV    — candle volume at OB
+  int  []  wM    — internal volume direction counter
+  int  []  blVP  — bullish volume profile bar width
+  int  []  brVP  — bearish volume profile bar width
+  int  []  dir   — candle direction (+1 bull / -1 bear)
+  float[]  h     — highs in scan range
+  float[]  l     — lows in scan range
+  int  []  n     — bar indices in scan range
+
+---------------------------------------------------------
+type obD (Order Block Draw)
+---------------------------------------------------------
+  Holds the visual TradingView objects for each OB.
+
+  box[]   ob    — main OB box
+  box[]   eOB   — extended OB box (right side)
+  box[]   blB   — bullish volume metric bar
+  box[]   brB   — bearish volume metric bar
+  line[]  mL    — midline of OB
+
+---------------------------------------------------------
+type FVG (Fair Value Gap)
+---------------------------------------------------------
+  Stores detected FVG/VI/OG coordinates and direction.
+
+  box[]   box   — drawn box objects
+  line[]  ln    — midline objects
+  bool    bull  — direction
+  float   top   — top of gap
+  float   btm   — bottom of gap
+  int     left  — left time reference
+  int     right — right time reference
+
+---------------------------------------------------------
+type zone (Accumulation/Distribution)
+---------------------------------------------------------
+  Stores individual pivot points used for zone detection.
+
+  chart.point  points — coordinate for polyline drawing
+  float  p  — pivot price
+  int    c  — pivot direction (+1 high / -1 low)
+  int    t  — bar time
+
+---------------------------------------------------------
+type alerts
+---------------------------------------------------------
+  Collects all alert flags throughout the script.
+  Two instances: blalert (bullish) and bralert (bearish)
+
+  bool bos           — BOS detected
+  bool choch         — CHoCH detected
+  bool chochplus     — CHoCH+ detected
+  bool chochplusswing— Swing CHoCH+ detected
+  bool chochswing    — Swing CHoCH detected
+  bool swingbos      — Swing BOS detected
+  bool equal         — EQH or EQL detected
+  bool ob            — Order Block created
+  bool swingob       — Swing Order Block created
+  bool zone          — Acc/Dist Zone detected
+  bool fvg           — FVG detected
+  bool obtouch       — Price entering Order Block
+
+=========================================================
+4. BOOLEAN STATE MANAGEMENT SYSTEM
+=========================================================
+
+A shared boolean array controls which market structure
+types are drawn. Instead of passing settings through
+every function, flags are set once and read anywhere.
+
+DECLARATION:
+
+  boolean = array.from(
+    false,  // index 0 = s_BOS   (Swing BOS)
+    false,  // index 1 = s_CHoCH (Swing CHoCH)
+    false,  // index 2 = i_BOS   (Internal BOS)
+    false,  // index 3 = i_CHoCH (Internal CHoCH)
+    false,  // index 4 = i_pp_CHoCH (Internal CHoCH+)
+    false,  // index 5 = green_candle
+    false,  // index 6 = red_candle
+    false,  // index 7 = s_CHoCHP (Swing CHoCH+)
+    false   // index 8 = i_CHoCHP (Internal CHoCH+)
+  )
+
+USAGE:
+
+  boolean.set(s_BOS, true)   — enable Swing BOS drawing
+  boolean.get(i_BOS)         — read: should we draw?
+
+HOW USER INPUTS CONTROL THIS:
+
+  When user selects "All" in Swing structure setting:
+    → s_BOS=true, s_CHoCH=true, s_CHoCHP=true
+
+  When user selects "BOS" only:
+    → s_BOS=true, s_CHoCH=false, s_CHoCHP=false
+
+  This runs at the beginning of the structure() function
+  on every bar so flags are always current.
+
+=========================================================
+5. BOS – BREAK OF STRUCTURE
+=========================================================
+
+CONCEPT:
+
+  BOS means price continues the existing trend by closing
+  beyond a previously established swing high (bullish)
+  or swing low (bearish).
+
+  Bullish BOS Pattern:
+    HH → HL → HH → HL → HH (new high = BOS)
+
+  Bearish BOS Pattern:
+    LL → LH → LL → LH → LL (new low = BOS)
+
+---------------------------------------------------------
+BULLISH BOS — STEP BY STEP
+---------------------------------------------------------
+
+Step 1: A pivot high is detected.
+
+  iH = ta.pivothigh(high, iLen, iLen)
+
+  This means the candle at position [iLen] bars ago
+  is higher than all candles iLen bars to its left
+  AND iLen bars to its right.
+
+  Example (iLen = 5):
+    Pivot High must be the highest of 11 candles.
+
+Step 2: The pivot high price is stored.
+
+  up.p.unshift(b.h[iLen])  — store high price
+  up.n.unshift(n[iLen])    — store bar index
+
+Step 3: Current close crosses above stored pivot high.
+
+  if ta.crossover(b.c, up.p.first())
+
+  Example:
+    Stored Pivot High = 4500
+    Current Close     = 4505
+    4505 > 4500  →  TRUE
+
+Step 4: Check if trend is already bullish.
+
+  if itrend > 0 (already bullish)
+    → this is a BOS (continuation)
+
+Step 5: Draw BOS line from pivot to current bar.
+
+  drw = msDraw.new(
+    up.n.first(),    — start bar
+    up.p.first(),    — price level
+    i_ms_up_BOS,    — green color
+    "BOS",
+    true             — bullish
+  )
+
+Step 6: Trigger alert and order block creation.
+
+  blalert.bos := true
+  bull_ob     := true (triggers OB detection)
+
+Step 7: Reset tracking.
+
+  itrend := 1       — trend is now bullish
+  up.n.clear()      — clear stored highs
+  up.p.clear()
+
+---------------------------------------------------------
+BEARISH BOS — STEP BY STEP
+---------------------------------------------------------
+
+Same logic in reverse:
+
+  if ta.crossunder(b.c, dn.p.first())
+
+  dn holds the stored pivot lows.
+  If itrend <= 0 → bearish BOS (continuation).
+  Sets bralert.bos := true and bear_ob := true.
+
+---------------------------------------------------------
+IMPORTANT NOTE ON VOLUME:
+
+  Volume is NOT used to confirm BOS.
+  Only pivot detection + candle close is used.
+
+=========================================================
+6. CHoCH – CHANGE OF CHARACTER
+=========================================================
+
+CONCEPT:
+
+  CHoCH occurs when BOS conditions are met but the
+  current trend is in the OPPOSITE direction. This
+  signals a potential trend reversal.
+
+  Bearish-to-Bullish CHoCH:
+
+    LL → LH → LL → LH
+    Price breaks ABOVE a LH
+    Previous trend was bearish (itrend = -1)
+    → CHoCH (bullish)
+
+---------------------------------------------------------
+CODE:
+
+  if itrend < 0      — trend was bearish
+    CHoCH := true    — flag as CHoCH not BOS
+
+  txt := "CHoCH"
+  css := i_ms_up_BOS.darkcss(0.25, true)
+    — slightly darker color than BOS to visually
+      differentiate reversal from continuation
+
+---------------------------------------------------------
+WHY DARKER COLOR?
+
+  BOS   = full color  (strong trend continuation)
+  CHoCH = 25% darker  (reversal, less confirmed)
+
+  darkcss() is a custom method:
+
+  method darkcss(color css, float factor, bool bull) =>
+    blue  = color.b(css) * (1 - factor)
+    red   = color.r(css) * (1 - factor)
+    green = color.g(css) * (1 - factor)
+    color.rgb(red, green, blue, 0)
+
+---------------------------------------------------------
+RESULT:
+
+  Line drawn from the broken swing level to current bar.
+  Label shows "CHoCH".
+  blalert.choch := true
+
+=========================================================
+7. CHoCH+ – CONFIRMED CHANGE OF CHARACTER
+=========================================================
+
+CONCEPT:
+
+  CHoCH+ is a higher-quality CHoCH signal.
+  It adds one extra confirmation on top of CHoCH:
+  the lows must show a higher low before the break.
+
+---------------------------------------------------------
+CODE:
+
+  txt := dn.l.first() > dn.l.get(1) ? "CHoCH+" : "CHoCH"
+
+  dn.l stores the recent pivot lows.
+  dn.l.first() = most recent low
+  dn.l.get(1)  = previous low
+
+---------------------------------------------------------
+EXAMPLE (Bullish CHoCH+):
+
+  Previous Low = 4480
+  Current Low  = 4490
+
+  4490 > 4480  →  TRUE
+  Higher Low confirmed.
+  THEN structure breaks.
+
+  Result: CHoCH+ displayed.
+
+---------------------------------------------------------
+WHY IS IT STRONGER?
+
+  CHoCH:   Structure breaks (trend reversal signal)
+  CHoCH+:  Higher Low + Structure Break
+            (two confirmations instead of one)
+
+  In SMC, a Higher Low before a break is evidence that
+  smart money is accumulating at higher lows, showing
+  demand building before the break.
+
+=========================================================
+8. INTERNAL STRUCTURE
+=========================================================
+
+CONCEPT:
+
+  Internal structure uses a short lookback period to
+  detect smaller, more frequent swing points.
+  This is for scalping, intraday, or short-term analysis.
+
+---------------------------------------------------------
+PARAMETER:
+
+  internal_r_lookback = 5  (default)
+  Stored as: iLen
+
+---------------------------------------------------------
+PIVOT DETECTION:
+
+  iH = ta.pivothigh(high, iLen, iLen)
+  iL = ta.pivotlow (low , iLen, iLen)
+
+  For a Pivot High at iLen=5:
+    The candle 5 bars ago must be the highest of:
+    5 bars to its left + itself + 5 bars to its right
+    = 11 candles total
+
+---------------------------------------------------------
+EXAMPLE (iLen = 5):
+
+  Bar values: 20, 22, 25, 30, 27, 26, 24, 23, 21, 20, 19
+
+  Candle with value 30:
+    Left 5:  20, 22, 25, 27, 26  — all lower than 30
+    Right 5: 26, 24, 23, 21, 20  — all lower than 30
+    Result: Pivot High = 30 confirmed
+
+---------------------------------------------------------
+DRAWING:
+
+  Internal BOS/CHoCH lines are drawn dashed.
+
+  if isdrw
+    f_line(drw, size.small, line.style_dashed)
+
+  Dashed = internal (smaller) structure.
+
+=========================================================
+9. SWING STRUCTURE
+=========================================================
+
+CONCEPT:
+
+  Swing structure uses a much longer lookback period
+  to detect major market turning points.
+  This is for trend direction and swing trading.
+
+---------------------------------------------------------
+PARAMETER:
+
+  swing_r_lookback = 50  (default)
+  Stored as: sLen
+
+---------------------------------------------------------
+PIVOT DETECTION:
+
+  sH = ta.pivothigh(high, sLen, sLen)
+  sL = ta.pivotlow (low , sLen, sLen)
+
+  For a Pivot High at sLen=50:
+    The candle must be the highest of 101 candles total.
+
+---------------------------------------------------------
+DRAWING:
+
+  Swing BOS/CHoCH lines are drawn solid.
+
+  if isdrwS
+    f_line(drw, size.small, line.style_solid)
+
+  Solid = swing (major) structure.
+
+---------------------------------------------------------
+DIFFERENCE FROM INTERNAL:
+
+  Internal (iLen=5):   Fast, catches small moves
+  Swing    (sLen=50):  Slow, catches major moves
+
+  Both run simultaneously on the chart.
+  Internal = dashed lines
+  Swing    = solid lines
+
+=========================================================
+10. DYNAMIC MARKET STRUCTURE MODE
+=========================================================
+
+CONCEPT:
+
+  In Dynamic mode, the internal lookback (iLen)
+  automatically adjusts based on recent volatility
+  measured using a Z-Score of price change.
+
+---------------------------------------------------------
+Z-SCORE CALCULATION:
+
+  f_zscore(src, lookback) =>
+    (src - ta.sma(src, lookback)) / ta.stdev(src, lookback)
+
+  Applied to:
+    vv = f_zscore(((close - close[iLen]) / close[iLen]) * 100, iLen)
+
+  This measures: how many standard deviations is the
+  recent price change away from its mean?
+
+---------------------------------------------------------
+DYNAMIC ADJUSTMENT:
+
+  When vv >= 1.5 → iLen = 10  (low volatility, wider)
+  When vv >= 1.6 → iLen = 9
+  When vv >= 1.7 → iLen = 8
+  When vv >= 1.8 → iLen = 7
+  When vv >= 1.9 → iLen = 6
+  When vv >= 2.0 → iLen = 5  (high volatility, tighter)
+
+  HIGH volatility → shorter lookback
+    (pivots are more significant, tighter detection)
+
+  LOW volatility → longer lookback
+    (fewer, more reliable pivots)
+
+---------------------------------------------------------
+MANUAL MODE:
+
+  User sets iLen manually via the input.
+  Default = 5.
+
+=========================================================
+11. ORDER BLOCK DETECTION
+=========================================================
+
+CONCEPT:
+
+  An Order Block (OB) is the last candle (or group of
+  candles) BEFORE a BOS or CHoCH that started the
+  impulsive move.
+
+  In SMC theory, institutions place large orders at these
+  price zones. When price returns to the OB, it may
+  react again.
+
+---------------------------------------------------------
+TRIGGER:
+
+  Order Blocks are ONLY created after:
+    ✓ BOS is detected
+    ✓ CHoCH is detected
+    ✓ CHoCH+ is detected
+
+  Code flags:
+
+    bull_ob := true   → triggers bullish OB scan
+    bear_ob := true   → triggers bearish OB scan
+
+---------------------------------------------------------
+THE drawVOB() FUNCTION:
+
+  This is the main Order Block engine. It:
+    1. Scans backward from current bar to last pivot
+    2. Finds the significant candle
+    3. Draws OB box
+    4. Tracks internal volume activity
+    5. Removes OB when mitigated
+
+---------------------------------------------------------
+SCAN RANGE:
+
+  for i = 0 to math.abs((loc - b.n)) - 1
+    obj.h.push(hH[i])
+    obj.l.push(lL[i])
+    obj.n.push(b.t[i])
+
+  This collects all candle highs, lows, and times
+  between current bar and the last pivot point.
+
+=========================================================
+12. BULLISH ORDER BLOCK DETECTION
+=========================================================
+
+STEP-BY-STEP:
+
+Step 1: Bullish BOS or CHoCH is confirmed.
+
+Step 2: Scan backward, collect all candle lows.
+
+  obj.l — array of all lows in scan range
+
+Step 3: Find the candle with the LOWEST LOW.
+
+  int iU = obj.l.indexof(obj.l.min()) + 1
+
+  Example:
+    Scan range lows: 4490, 4485, 4470, 4480, 4490
+    Minimum = 4470
+    Index of minimum = 2  (candle 2 from current bar)
+    iU = 3
+
+Step 4: Set OB coordinates.
+
+  obj.top.unshift(pos[iU])      — OB top
+  obj.btm.unshift(obj.l.min())  — OB bottom = lowest low
+  obj.left.unshift(obj.n.get(obj.l.indexof(obj.l.min())))
+
+  pos depends on "Positioning" setting:
+    Full     → OB top = candle high
+    Middle   → OB top = ohlc4 (average of O+H+L+C)
+    Accurate → OB top = hl2   (average of H+L)
+    Precise  → Same as Accurate with body adjustment
+
+Step 5: OB box drawn from left time to current bar.
+
+  dOB.set_lefttop(obj.left.get(i), obj.top.get(i))
+  dOB.set_rightbottom(b.t, obj.btm.get(i))
+
+---------------------------------------------------------
+RESULT:
+
+  A green box appears at the lowest-low candle before
+  the bullish BOS. This is the Bullish Order Block.
+
+=========================================================
+13. BEARISH ORDER BLOCK DETECTION
+=========================================================
+
+STEP-BY-STEP:
+
+Step 1: Bearish BOS or CHoCH is confirmed.
+
+Step 2: Scan backward, collect all candle highs.
+
+  obj.h — array of all highs in scan range
+
+Step 3: Find the candle with the HIGHEST HIGH.
+
+  int iD = obj.h.indexof(obj.h.max()) + 1
+
+  Example:
+    Scan range highs: 4510, 4520, 4540, 4530
+    Maximum = 4540
+    Index of maximum = 2
+    iD = 3
+
+Step 4: Set OB coordinates.
+
+  obj.top.unshift(obj.h.max())  — OB top = highest high
+  obj.btm.unshift(pos[iD])      — OB bottom
+
+Step 5: OB box is drawn.
+
+---------------------------------------------------------
+RESULT:
+
+  A red box appears at the highest-high candle before
+  the bearish BOS. This is the Bearish Order Block.
+
+=========================================================
+14. VOLUMETRIC ACTIVITY INSIDE ORDER BLOCKS
+=========================================================
+
+CONCEPT:
+
+  After an OB is created, the indicator tracks which
+  direction volume flows inside that OB zone as
+  subsequent candles trade through it.
+
+  This is displayed as two small bars inside the OB:
+    Green bar = buying activity
+    Red bar   = selling activity
+
+---------------------------------------------------------
+VOLUME STORED AT CREATION:
+
+  obj.cV.unshift(volume)  — volume of the OB candle
+
+---------------------------------------------------------
+VOLUME PERCENTAGE CALCULATION:
+
+  Example:
+    OB1 Volume = 4600
+    OB2 Volume = 2000
+    OB3 Volume = 5000
+    OB4 Volume = 4000
+
+    Total = 15600
+
+    OB1 % = 4600 / 15600 × 100 = 29%
+
+  Displayed on chart as:
+    4.6K (29%)
+
+---------------------------------------------------------
+INTERNAL DIRECTION TRACKING (3-state cycle):
+
+  Each OB tracks direction using obj.wM (weight marker):
+
+  If OB candle was bullish (dir = +1):
+    State 1 → blVP += 1, state → 2
+    State 2 → blVP += 1, state → 3
+    State 3 → brVP += 1, state → 1
+
+  If OB candle was bearish (dir = -1):
+    State 1 → brVP += 1, state → 2
+    State 2 → brVP += 1, state → 3
+    State 3 → blVP += 1, state → 1
+
+  blVP = width of green (buy) bar
+  brVP = width of red   (sell) bar
+
+---------------------------------------------------------
+IMPORTANT CLARIFICATION:
+
+  Volume in this indicator does NOT confirm BOS.
+  Volume is ONLY used to:
+    1. Show relative importance of each OB
+    2. Display internal buy/sell activity inside OB
+    3. Track which direction candles are moving in OB
+
+  It does NOT represent:
+    ✗ Real institutional orders
+    ✗ Liquidity pool data
+    ✗ Exchange order book
+
+=========================================================
+15. ORDER BLOCK MITIGATION
+=========================================================
+
+CONCEPT:
+
+  An Order Block is "mitigated" when price closes
+  beyond it. At that point, the OB is considered
+  consumed and is removed from the chart.
+
+---------------------------------------------------------
+TWO MITIGATION MODES:
+
+Mode 1 — Absolute:
+  Bullish OB: removed when close < OB bottom
+  Bearish OB: removed when close > OB top
+
+  tg = bull ? obj.btm : obj.top
+
+Mode 2 — Middle:
+  Removed when close crosses the OB midpoint.
+
+  tg = obj.avg  (midpoint of top and bottom)
+
+---------------------------------------------------------
+CODE:
+
+  if (bull ? cC < pt : cC > pt)
+    obj.top  .remove(idx)
+    obj.btm  .remove(idx)
+    obj.avg  .remove(idx)
+    obj.left .remove(idx)
+    obj.cV   .remove(idx)
+    obj.dir  .remove(idx)
+    obj.blVP .remove(idx)
+    obj.brVP .remove(idx)
+
+  All data for that OB is removed simultaneously.
+
+=========================================================
+16. ORDER BLOCK OVERLAP HANDLING
+=========================================================
+
+CONCEPT:
+
+  When two OBs overlap (their price ranges intersect),
+  one is removed to keep the chart clean.
+
+---------------------------------------------------------
+CODE:
+
+  if bull
+    ? obj.btm.first() < obj.top.get(1)
+    : obj.top.first() > obj.btm.get(1)
+
+  Two overlap methods:
+
+  "Recent"   → remove the newer OB (keep older)
+  "Previous" → remove the older OB (keep newer)
+
+  int rmP = use_overlap_method == "Recent" ? 1 : 0
+  obj.top.remove(rmP)  — 0=first/new, 1=second/old
+
+=========================================================
+17. STRONG HIGH / WEAK HIGH
+=========================================================
+
+FUNCTION: upphl()
+
+CONCEPT:
+
+  The most recent Swing High is classified based on
+  current trend direction.
+
+STRONG HIGH:
+  Occurs when the current trend is BEARISH.
+  Price is respecting this high and not breaking it.
+  Liquidity is building below it.
+
+  Meaning: Market is using this as a ceiling.
+           Smart money protecting this level.
+
+WEAK HIGH:
+  Occurs when the current trend is BULLISH.
+  Price is likely to sweep through this high.
+
+  Meaning: This high has "resting liquidity" above it.
+           Likely to be taken out.
+
+---------------------------------------------------------
+CODE:
+
+  label.set_text(lbl, trend < 0
+    ? "Strong High | " + volume_str + " (" + pct + "%)"
+    : "Weak High | "   + volume_str + " (" + pct + "%)")
+
+  The volume shown is the volume of the candle that
+  made the Swing High (stored as phl.uV).
+
+---------------------------------------------------------
+HH / HL LABELING:
+
+  When a new Swing High forms:
+
+  phl.txtup := top > phl.topy ? "HH" : "HL"
+
+  HH = Higher High than previous swing high
+  HL = Higher Low (lower than previous swing high)
+
+  These labels appear if "Show swing point" is enabled.
+
+=========================================================
+18. STRONG LOW / WEAK LOW
+=========================================================
+
+FUNCTION: dnphl()
+
+STRONG LOW:
+  Occurs when current trend is BULLISH.
+  Price is respecting this low and bouncing from it.
+
+  Meaning: Demand zone. Buyers defending this level.
+
+WEAK LOW:
+  Occurs when current trend is BEARISH.
+  Price is likely to break this low and take liquidity.
+
+---------------------------------------------------------
+LL / LH LABELING:
+
+  phl.txtdn := btm > phl.bottomy ? "LH" : "LL"
+
+  LL = Lower Low than previous swing low
+  LH = Lower High in lows (higher than previous swing low)
+
+=========================================================
+19. EQUILIBRIUM & PREMIUM / DISCOUNT ZONES
+=========================================================
+
+FUNCTION: midphl() and hqlzone()
+
+CONCEPT:
+
+  Between the highest Swing High and lowest Swing Low,
+  three zones are defined based on Fibonacci logic:
+
+  PREMIUM ZONE (top 50% of range):
+    Price is expensive relative to the range.
+    Smart money SELLS in premium.
+    Color: Red (toplvl)
+
+  EQUILIBRIUM (middle 5% band at 50% level):
+    Fair value of price.
+    Used as reference for entries.
+    Color: Gray (midlvl)
+
+  DISCOUNT ZONE (bottom 50% of range):
+    Price is cheap relative to the range.
+    Smart money BUYS in discount.
+    Color: Green (btmlvl)
+
+---------------------------------------------------------
+ZONE BOUNDARIES (code):
+
+  Premium zone:
+    Top    = phl.tup  (swing high)
+    Bottom = 0.95 * phl.tup + 0.05 * phl.tdn
+
+  Equilibrium band:
+    Top    = 0.525 * phl.tup + 0.475 * phl.tdn
+    Bottom = 0.525 * phl.tdn + 0.475 * phl.tup
+
+  Discount zone:
+    Top    = 0.95 * phl.tdn + 0.05 * phl.tup
+    Bottom = phl.tdn  (swing low)
+
+---------------------------------------------------------
+EQUILIBRIUM LABEL shows distance from current price:
+
+  dist = math.abs((l.get_y2() - close) / close) * 100
+  label text = "Equilibrium (12%)"
+    → price is 12% away from equilibrium
+
+=========================================================
+20. MULTI-TIMEFRAME TREND SCANNER
+=========================================================
+
+CONCEPT:
+
+  The same structure() detection engine runs on 4
+  higher timeframes simultaneously. Results are shown
+  in a table in the top-right corner.
+
+---------------------------------------------------------
+TIMEFRAMES:
+
+  15 Minute
+  1 Hour
+  4 Hour
+  1 Day
+
+---------------------------------------------------------
+CODE:
+
+  [_, _, _, itrend15, ...] = request.security("", "15",   structure(true))
+  [_, _, _, itrend1H, ...] = request.security("", "60",   structure(true))
+  [_, _, _, itrend4H, ...] = request.security("", "240",  structure(true))
+  [_, _, _, itrend1D, ...] = request.security("", "1440", structure(true))
+
+  The "true" argument tells structure() it's in MTF
+  mode so it skips drawing (only returns trend value).
+
+---------------------------------------------------------
+TREND VALUES:
+
+  itrend =  1 → BULLISH (displayed in green)
+  itrend = -1 → BEARISH (displayed in red)
+  itrend =  0 → NEUTRAL (displayed in gray)
+
+---------------------------------------------------------
+TABLE DISPLAY:
+
+  Row   | Column 0 | Column 1
+  ------+----------+---------
+  Row 1 | "15"     | BULLISH / BEARISH
+  Row 2 | "1H"     | BULLISH / BEARISH
+  Row 3 | "4H"     | BULLISH / BEARISH
+  Row 4 | "1D"     | BULLISH / BEARISH
+  Row 5 | "Detected Pattern" (merged columns)
+  Row 6 | Pattern name (merged columns)
+
+---------------------------------------------------------
+PATTERN ROW:
+
+  When an Accumulation or Distribution zone is found,
+  the pattern name is shown in the table:
+
+  "Accumulation Zone"  — bullish color
+  "Distribution Zone"  — bearish color
+
+  Pattern display auto-clears after 50 bars.
+
+=========================================================
+21. MTF HIGHS & LOWS
+=========================================================
+
+FUNCTIONS: mtfphl() — called for each timeframe
+
+WHAT IT DRAWS:
+
+  PDH  = Previous Day   High
+  PDL  = Previous Day   Low
+  PWH  = Previous Week  High
+  PWL  = Previous Week  Low
+  PMH  = Previous Month High
+  PML  = Previous Month Low
+  PYH  = Previous Year  High
+  PYL  = Previous Year  Low
+
+---------------------------------------------------------
+HOW IT WORKS:
+
+  request.security() fetches the high/low from each
+  timeframe using lookahead_on to get the PREVIOUS
+  completed period's values.
+
+  [pdh, pdl] = request.security(syminfo.tickerid, 'D',
+    hl(), lookahead = barmerge.lookahead_on)
+
+---------------------------------------------------------
+DRAWING (on last bar only):
+
+  Line starts at the time the high/low was made.
+  Line extends 50 bars into the future.
+  Label appears at the right end.
+
+  extension = time + (time - time[1]) * 50
+
+  Line style options: Solid, Dashed, Dotted
+
+---------------------------------------------------------
+LABELS:
+
+  "PDH" — Previous Day High
+  "PDL" — Previous Day Low
+  etc.
+
+=========================================================
+22. FAIR VALUE GAP (FVG)
+=========================================================
+
+CONCEPT:
+
+  A Fair Value Gap is an inefficiency in price.
+  It occurs when three consecutive candles create a gap
+  between candle 1's extreme and candle 3's extreme
+  that candle 2 does not fill.
+
+  Bullish FVG:
+    Candle[-2] Low > Candle[0] High
+    (gap between candle 1's low and candle 3's high)
+
+  Bearish FVG:
+    Candle[-2] High < Candle[0] Low
+
+---------------------------------------------------------
+CODE:
+
+  "FVG" mode:
+    cdn (bullish) = gl > h and cc
+      gl = low of 2 bars ago (from HTF)
+      h  = high of current period
+      cc = timeframe changed (new candle confirmed)
+
+---------------------------------------------------------
+MITIGATION:
+
+  FVG is removed when price closes inside the gap:
+
+  if obj.bull ? b.c < obj.btm : b.c > obj.top
+    cords.remove(idx)
+
+---------------------------------------------------------
+EXTENSION:
+
+  FVG boxes extend fvg_extend bars to the right.
+  User can set how far they project.
+
+---------------------------------------------------------
+TIMEFRAME SUPPORT:
+
+  FVGs can be detected on a different timeframe than
+  the current chart via the fvg_tf input.
+
+=========================================================
+23. VOLUME IMBALANCE (VI)
+=========================================================
+
+CONCEPT:
+
+  Volume Imbalance (VI) is a gap between two consecutive
+  candle BODIES (open/close), not wicks.
+  It is a smaller, more frequent inefficiency than FVG.
+
+---------------------------------------------------------
+CODE:
+
+  Bullish VI top = body top of candle[-1]
+  Bullish VI btm = body bottom of candle[0]
+
+  pup = gc > go ? gc : go  — higher of O/C of candle 0
+  pdn = gc[1] > go[1] ? gc[1] : go[1]  — lower of candle -1
+
+  Condition:
+    go > gc[1]    — current open above previous close
+    gh[1] > gl    — overlap in wicks
+    gc > gc[1]    — close increasing
+    go > go[1]    — open increasing
+    gh[1] < math.min(gc, go)  — previous high below current body
+
+=========================================================
+24. OPEN GAP (OG)
+=========================================================
+
+CONCEPT:
+
+  Open Gap is when the opening price of a new session
+  gaps above or below the previous session's range.
+  Common in stocks at market open.
+
+---------------------------------------------------------
+CODE:
+
+  Bullish OG:
+    pup = b.l   (current low)
+    pdn = gh[1] (previous high)
+    cdn = gl > gh[1] and cc
+      → current gap low is above previous high
+
+  Bearish OG:
+    pup = gl[1] (previous low gap)
+    pdn = gh    (current high)
+    cdn = gh < gl[1] and cc
+      → current high is below previous low
+
+=========================================================
+25. ACCUMULATION & DISTRIBUTION ZONES
+=========================================================
+
+FUNCTION: drawZone()
+
+CONCEPT:
+
+  Uses a sequence of alternating pivot highs and lows
+  to detect range-bound coiling patterns.
+
+  Accumulation Zone = price coiling at a bottom
+    → Smart money absorbing supply before markup
+
+  Distribution Zone = price coiling at a top
+    → Smart money distributing before markdown
+
+---------------------------------------------------------
+FAST MODE (4 pivots needed):
+
+  Accumulation:
+    Pivot sequence: Low, High, Low, High
+    Condition:
+      Lows descending:   Low[0] > Low[2]
+      Highs ascending:   High[1] < High[3]
+
+  Distribution:
+    Pivot sequence: High, Low, High, Low
+    Condition:
+      Highs ascending:  High[0] < High[2]
+      Lows descending:  Low[1] > Low[3]
+
+---------------------------------------------------------
+SLOW MODE (6 pivots needed):
+
+  Same logic but requires 6 pivot alternations,
+  giving a more confirmed, larger pattern.
+
+---------------------------------------------------------
+WHAT IS DRAWN:
+
+  1. A box covering the price range of the zone
+  2. A polyline connecting all pivot points (zigzag)
+
+  Accumulation → Green box + green zigzag
+  Distribution → Red box + red zigzag
+
+---------------------------------------------------------
+PATTERN MEMORY:
+
+  p.found   = "Accumulation Zone" or "Distribution Zone"
+  p.isfound = true
+  p.period  = 0  (resets counter)
+
+  Pattern shown in MTF table for next 50 bars,
+  then cleared:
+
+  if p.period == 50
+    p.period  := 0
+    p.found   := "None"
+    p.isfound := false
+
+=========================================================
+26. EQUAL HIGHS & EQUAL LOWS (EQH / EQL)
+=========================================================
+
+FUNCTION: dEHL()
+
+CONCEPT:
+
+  When two consecutive pivot highs (or lows) are at
+  nearly the same price level, they form equal highs
+  (EQH) or equal lows (EQL).
+
+  In SMC, these are considered liquidity pools —
+  stop orders accumulate above EQH and below EQL.
+
+---------------------------------------------------------
+DETECTION:
+
+  Uses ta.pivothigh() and ta.pivotlow() with lookback=1
+  (very sensitive, catches every minor pivot).
+
+  atr = ta.atr(200)  — 200-period ATR as threshold
+
+  For EQH:
+    mx = math.max(top, w.pt)  — higher of two highs
+    mn = math.min(top, w.pt)  — lower of two highs
+
+    if mx < mn + atr * 0.1
+      → the two highs are within 10% of one ATR
+      → Equal Highs detected
+
+  For EQL: same logic with lows.
+
+---------------------------------------------------------
+WHAT IS DRAWN:
+
+  A dotted line connecting the two equal points.
+  A label showing "EQH" or "EQL" at the midpoint.
+
+  EQH: line in red, label above
+  EQL: line in green, label below
+
+---------------------------------------------------------
+LIMIT:
+
+  Max 50 EQH/EQL lines stored (oldest deleted first).
+
+=========================================================
+27. ALERT SYSTEM
+=========================================================
+
+CONCEPT:
+
+  Two alert objects collect boolean flags during
+  every bar's calculation.
+
+  blalert = bullish alerts
+  bralert = bearish alerts
+
+---------------------------------------------------------
+ALL ALERT CONDITIONS:
+
+  Bullish Side:
+    Bullish BOS
+    Bullish CHoCH
+    Bullish CHoCH+
+    Bullish Swing CHoCH+
+    Bullish Swing CHoCH
+    Bullish Swing BOS
+    EQL (Equal Lows)
+    Bullish FVG
+    Bullish Order Block
+    Bullish Swing Order Block
+    Accumulation Zone
+    Candle Entering Bullish Order Block
+
+  Bearish Side:
+    Bearish BOS
+    Bearish CHoCH
+    Bearish CHoCH+
+    Bearish Swing CHoCH+
+    Bearish Swing CHoCH
+    Bearish Swing BOS
+    EQH (Equal Highs)
+    Bearish FVG
+    Bearish Order Block
+    Bearish Swing Order Block
+    Distribution Zone
+    Candle Entering Bearish Order Block
+
+---------------------------------------------------------
+HOW ALERTS FIRE:
+
+  alertcondition(blalert.bos, "Bullish BOS", "Bullish BOS")
+
+  Each flag is wired to alertcondition() at the end of
+  the script. User can set TradingView alerts on any
+  of these from the alert creation dialog.
+
+=========================================================
+28. PLOTTING & BAR COLORING
+=========================================================
+
+TWO OPTIONAL DISPLAY MODES:
+
+---------------------------------------------------------
+Plot Candle Mode (plotcandle_bool):
+
+  Draws a new set of candles colored by trend on top
+  of the default chart candles.
+
+  plotcandle(open, high, low, close,
+    color      = p_css,   — body color
+    wickcolor  = w_css,   — wick color (semi-transparent)
+    bordercolor= p_css    — border color
+  )
+
+  The user must hide the default candles in TradingView
+  for this to look clean.
+
+---------------------------------------------------------
+Bar Color Mode (barcolor_bool):
+
+  Colors the existing candle bars according to
+  the current trend color (css).
+
+  barcolor(b_css)
+
+---------------------------------------------------------
+COLOR SOURCE:
+
+  css is set inside structure() based on the last
+  BOS or CHoCH direction:
+
+  Bullish break → css = i_ms_up_BOS (green)
+  Bearish break → css = i_ms_dn_BOS (red)
+
+=========================================================
+29. COMPLETE INDICATOR WORKFLOW
+=========================================================
+
+Every time a new candle arrives:
+
+  ┌─────────────────────────────────────────┐
+  │ 1. bar UDT initialized with OHLCV       │
+  │    b.o, b.c, b.h, b.l, b.v, b.n, b.t   │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 2. Boolean flags set from user inputs   │
+  │    s_BOS, i_CHoCH, etc. → true/false   │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 3. Z-Score calculated (Dynamic mode)    │
+  │    Adjust iLen if needed                │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 4. Pivot Highs & Lows detected          │
+  │    iH, iL (internal)                   │
+  │    sH, sL (swing)                      │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 5. structure() function runs            │
+  │    Stores pivots in up/dn/sup/sdn       │
+  │    Checks crossover/crossunder          │
+  │    Determines BOS or CHoCH or CHoCH+    │
+  │    Sets: css, trend, itrend             │
+  │    Returns: drw (draw object)           │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 6. BOS/CHoCH line drawn                 │
+  │    Internal = dashed                   │
+  │    Swing    = solid                    │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 7. structure() runs on 15m/1H/4H/1D    │
+  │    via request.security()              │
+  │    Returns itrend15/1H/4H/1D           │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 8. MTF Table updated (top-right)        │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 9. Strong/Weak High & Low calculated    │
+  │    upphl() and dnphl()                 │
+  │    hqlzone() draws Premium/Discount    │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 10. Order Blocks processed              │
+  │     drawVOB() scans for OB candle      │
+  │     Creates OB boxes                   │
+  │     Checks mitigation each bar         │
+  │     Updates volume activity bars       │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 11. FVG / VI / OG processed             │
+  │     cG(true) — bullish gaps            │
+  │     cG(false) — bearish gaps           │
+  │     Remove filled gaps each bar        │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 12. Accumulation / Distribution zones   │
+  │     drawZone() checks pivot sequence   │
+  │     Draws box + polyline if found      │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 13. EQH / EQL detection                 │
+  │     dEHL() compares consecutive pivots │
+  │     Draws dotted line if within ATR    │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 14. MTF Highs & Lows updated            │
+  │     PDH/PDL/PWH/PWL/PMH/PML/PYH/PYL  │
+  │     Extended lines on last bar         │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 15. Bar coloring applied                │
+  │     plotcandle() or barcolor()         │
+  └────────────────┬────────────────────────┘
+                   ↓
+  ┌─────────────────────────────────────────┐
+  │ 16. Alert conditions evaluated          │
+  │     All blalert.* and bralert.* flags  │
+  │     Fire TradingView alerts if set     │
+  └─────────────────────────────────────────┘
+
+=========================================================
+30. FINAL CONCLUSION
+=========================================================
+
+WHAT THIS INDICATOR IS:
+
+  A complete Smart Money Concepts price action engine
+  built entirely on pivot detection and candle close
+  confirmation.
+
+  It automates the core SMC framework:
+
+    Market Structure → BOS / CHoCH / CHoCH+
+    Key Levels       → Order Blocks / FVG / EQH / EQL
+    Bias             → MTF Trend Table
+    Zones            → Premium / Discount / Equilibrium
+    Patterns         → Accumulation / Distribution
+
+---------------------------------------------------------
+WHAT CONFIRMS BOS / CHoCH:
+
+  ✓ Pivot High or Pivot Low (ta.pivothigh / ta.pivotlow)
+  ✓ Candle Close above/below the pivot level
+  ✓ Previous trend direction (for CHoCH vs BOS)
+
+  ✗ Volume NOT used for BOS/CHoCH confirmation
+  ✗ No delta, no orderflow, no DOM
+
+---------------------------------------------------------
+WHERE VOLUME IS USED:
+
+  Only inside Order Blocks:
+    1. Relative importance % of each OB
+    2. Internal buy/sell activity display bars
+
+---------------------------------------------------------
+WHAT MAKES THIS A STRONG INDICATOR:
+
+  • Dual structure (internal + swing) on same chart
+  • Dynamic lookback adapts to volatility
+  • 4-timeframe trend at a glance
+  • Volumetric OB ranking
+  • Auto-removal of mitigated OBs and filled FVGs
+  • Pattern detection (Accumulation / Distribution)
+  • 24 individual alert conditions
+
+---------------------------------------------------------
+LIMITATIONS:
+
+  • All signals are PRICE ACTION only
+  • No real volume data beyond what TradingView provides
+  • No connection to real order books or exchange data
+  • Past performance of detected patterns is not
+    guaranteed to repeat
+  • Best used as a framework for confluence, not as
+    a standalone buy/sell signal
+
+=========================================================
+END OF DOCUMENTATION
+=========================================================
