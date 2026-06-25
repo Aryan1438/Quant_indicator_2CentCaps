@@ -2,8 +2,6 @@
  
 //@version=5
 indicator("Aryan - Price Action ", shorttitle = "Aryan Price Action", overlay = true, max_lines_count = 500, max_labels_count = 500, max_boxes_count = 500, max_bars_back = 500, max_polylines_count = 100)
- 
- 
 //-----------------------------------------------------------------------------{
     //Boolean set
 //-----------------------------------------------------------------------------{
