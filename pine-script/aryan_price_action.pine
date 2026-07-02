@@ -14,7 +14,8 @@ green_candle = 5
 red_candle   = 6
 s_CHoCHP     = 7
 i_CHoCHP     = 8
- 
+
+
 boolean =
  array.from(
    false
