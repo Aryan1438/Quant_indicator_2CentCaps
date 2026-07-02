@@ -1,5 +1,6 @@
 """Command-line entry point for running the Aryan Price Action backtest."""
 
+
 from __future__ import annotations
 
 import argparse
